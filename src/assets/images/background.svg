@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1442px" height="980px" viewBox="0 0 1442 980" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>背景</title>
+    <g id="后台" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="登录页" transform="translate(1.000000, 0.000000)" fill="#3E3B48">
+            <g id="背景" transform="translate(-0.287625, 0.000000)">
+                <path d="M0.287238616,324.562 L596.004717,668.5 C664.878855,708.264502 688.476877,796.33352 648.712375,865.207658 L582.437239,979.999 L0.287624907,980 L0.287238616,324.562 Z" id="形状结合"></path>
+                <path d="M1440.28762,0 L1440.28686,230.785231 L1306.57387,153.586823 C1286.48558,141.988844 1279.60282,116.302046 1291.2008,96.2137563 L1346.74986,-0.000769271286 L1440.28762,0 Z" id="形状结合"></path>
+            </g>
+        </g>
+    </g>
+</svg>
