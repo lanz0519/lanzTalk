@@ -14,12 +14,11 @@ export default new Router({
       path: '/main',
       name: 'Main',
       component: () => import('@/views/main/index')
-    }
-    /*
-    {
-      path: '/',
-      name: 'HelloWorld',
-      component: () => import('@/components/HelloWorld')
-    }, */
+    },
+    // {
+    //   path: '/',
+    //   name: 'HelloWorld',
+    //   component: () => import('@/components/HelloWorld')
+    // },
   ]
 })

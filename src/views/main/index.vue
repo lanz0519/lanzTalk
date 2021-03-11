@@ -45,7 +45,7 @@
     <div class="main">
       <div class="messageListTop"></div>
       <hr class="friendsHr">
-      <div class="messageMainList">
+      <div class="messageMainList" id="messageDiv">
         <div class="friendInfo"></div>
         <!-- 消息显示div -->
         <div class="messages" v-for="item in msgRecord">
@@ -106,8 +106,10 @@ export default {
   },
   mounted() {
     this.myName = this.username
+    console.log(this.recentContactid)
     recentContact(this.recentContactid).then(res => {
       this.recentContactList = res.recentContact
+      console.log(this.recentContactList)
     })
     this.login()
     // 获取消息记录
@@ -163,13 +165,15 @@ export default {
     },
     // 点击好友卡片之后建立连接
     createConn(toUserInfo) {
+      console.log('---------', toUserInfo.objectId)
       // 把当前聊天的好友信息获取出来
       this.nowChatUserInfo = toUserInfo
       // 获取消息记录并显示
-      searchRecord().then(res => {
+      searchRecord(this.objectId, toUserInfo.objectId).then(res => {
         this.msgRecord = res.results
+        console.log(this.msgRecord,this.objectId, toUserInfo.objectId)
       })
-      
+
       this.toName = toUserInfo.username
       if (this.toName.length == 0) {
         return new Error("用户名为空")
@@ -199,14 +203,22 @@ export default {
         content: this.messageInput,
         receiver: this.nowChatUserInfo.objectId
       }).then(res => {
-        console.log(res)
+        this.messageInput = ''
+        //发送消息
+        if (this.conn.open) {
+          console.log('我的消息:', this.messageInfo)
+          this.sendMessage(this.messageInfo);
+        }
       })
-      this.messageInput = ''
-      //发送消息
-      if (this.conn.open) {
-        console.log('我的消息:', this.messageInfo)
-        this.sendMessage(this.messageInfo);
-      }
+    }
+  },
+  watch: {
+    msgRecord: function () {
+      let div = document.getElementById('messageDiv');
+      console.log(div.scrollTop, div.scrollHeight)
+      setTimeout(() => {
+        div.scrollTop = div.scrollHeight;
+      }, 20)
     }
   }
 }
@@ -226,6 +238,7 @@ export default {
   width: 7%;
   background-color: rgb(20, 22, 25);
   float: left;
+  /* position:relative; */
 }
 .avatar {
   height: 85px;
@@ -250,8 +263,7 @@ export default {
   width: 75px;
   background-color: #4b4e55;
   margin: 0px auto;
-  margin-top: 400px;
-  margin-bottom: 10px;
+  margin-top: 480%;
   overflow: hidden;
   border-radius: 100%;
 }
@@ -333,17 +345,23 @@ export default {
 }
 .messageMainList {
   width: 100%;
-  height: 620px;
-  overflow: auto;
+  height: 85%;
+  overflow: hidden;
+  /* padding-right: 20px; */
+}
+.messageMainList:hover {
+    overflow-y: auto;
 }
 .messageInfoDiv {
   float: left;
   width: 100%;
   position: absolute;
-  top: 680px;
+  /* top: 780px; */
+  bottom: 20px;
 }
 .messages {
   margin: 0px 0px 20px 0px;
+  /* width: 100%; */
 }
 .messageInput {
   width: 68%;
