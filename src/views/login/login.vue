@@ -108,7 +108,7 @@ export default {
             .dispatch('user/login', this.loginForm)
             .then(() => {
               this.loading = false
-              this.$router.push({ 
+              this.$router.push({
                 path: '/main'
               })
             })

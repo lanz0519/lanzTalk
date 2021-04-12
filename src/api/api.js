@@ -30,7 +30,7 @@ export function addRecord (data) {
 // 查找最近的聊天记录
 export function searchRecord (objId, toObjId) {
   return request({
-    url: `parse/classes/Record?include=sender,receiver&&limit=20&&where={"$or":[{"sender":"${objId}","receiver":"${toObjId}"},{"sender":"${toObjId}","receiver":"${objId}"}]}`,
+    url: `parse/classes/Record?include=sender,receiver&&limit=20&&order=-createdAt&&where={"$or":[{"sender":"${objId}","receiver":"${toObjId}"},{"sender":"${toObjId}","receiver":"${objId}"}]}`,
     methos: 'get'
   })
 }

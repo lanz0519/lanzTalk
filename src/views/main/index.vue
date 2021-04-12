@@ -43,7 +43,16 @@
     </div>
     <!-- 主体，搜索好友或者和好友的消息 -->
     <div class="main">
-      <div class="messageListTop"></div>
+      <div class="messageListTop">
+        <!-- 消息列表上方导航右侧按钮 -->
+        <div class="messageListTopRight">
+          <i class="el-icon-phone" @click="callPhone()"></i>
+        </div>
+        <!-- 语音通话弹窗 -->
+        <div v-show="callPhonePopShow" class="callPhonePop" @click="closecallPhonePop()">
+          <audio id="audio"></audio>
+        </div>
+      </div>
       <hr class="friendsHr">
       <div class="messageMainList" id="messageDiv">
         <div class="friendInfo"></div>
@@ -51,8 +60,8 @@
         <div class="messages" v-for="item in msgRecord">
           <div class="messageAvatar"></div>
           <div class="messageInfo">
-            <div class="messageFrom">{{item.sender.username}}</div>
-            <div class="messageTime">2020/9/18</div>
+            <div class="messageFrom">{{item.sender.username ? item.sender.username : item.sender}}</div>
+            <div class="messageTime">{{formatTime(item.createdAt)}}</div>
           </div>
           <div class="messageBody">{{item.content}}</div>
         </div>
@@ -73,6 +82,8 @@
 import Peer from 'peerjs'
 import { mapGetters } from "vuex"
 import { recentContact,addRecord,searchRecord } from "@/api/api"
+import dayjs from 'dayjs'
+dayjs().format() 
 
 export default {
   name: 'Main',
@@ -88,7 +99,9 @@ export default {
       peer: null,
       conn: null,
       recentContactList: [],
-      nowChatUserInfo: {}
+      nowChatUserInfo: {},
+      callPhonePopShow: false,
+      audio: null
     }
   },
   computed: {
@@ -106,16 +119,15 @@ export default {
   },
   mounted() {
     this.myName = this.username
-    console.log(this.recentContactid)
+    // console.log(this.recentContactid)
     recentContact(this.recentContactid).then(res => {
       this.recentContactList = res.recentContact
-      console.log(this.recentContactList)
+      // console.log(this.recentContactList)
     })
     this.login()
-    // 获取消息记录
-    searchRecord().then(res => {
-      console.log(res)
-    })
+
+    // 获取audio控件
+    this.audio = document.getElementById("audio")
   },
   methods: {
     hashCode(str){
@@ -142,13 +154,14 @@ export default {
       //register成功的回调
       this.peer.on('open', function (id) {
         this.userId = id
-        console.log('userId', this.userId)
+        // console.log('userId', this.userId)
       });
 
       this.peer.on('connection', (conn) => {
         console.log('有人连接了')
         //收到对方消息的回调
         conn.on('data', (data) => {
+          console.log('有人call2========')
           var msg = JSON.parse(data);
           console.log('对方的消息', msg)
           this.msgRecord.push(msg)
@@ -158,6 +171,19 @@ export default {
           }
         });
       });
+
+      this.peer.on('call', (call) => {
+        console.log('有人call1========')
+        navigator.mediaDevices.getUserMedia({video: false, audio: true}, (stream) => {
+          call.answer(stream); // Answer the call with an A/V stream.
+          call.on('stream', (remoteStream) => {
+            // Show stream in some <video> element.
+            this.audio.srcObject = remoteStream
+          });
+        }, (err) => {
+          console.error('Failed to get local stream', err);
+        });
+      });
     },
     sendMessage(message) {
       this.conn.send(JSON.stringify(message));
@@ -165,13 +191,13 @@ export default {
     },
     // 点击好友卡片之后建立连接
     createConn(toUserInfo) {
-      console.log('---------', toUserInfo.objectId)
+      // console.log('---------', toUserInfo.objectId)
       // 把当前聊天的好友信息获取出来
       this.nowChatUserInfo = toUserInfo
       // 获取消息记录并显示
       searchRecord(this.objectId, toUserInfo.objectId).then(res => {
-        this.msgRecord = res.results
-        console.log(this.msgRecord,this.objectId, toUserInfo.objectId)
+        this.msgRecord = res.results.reverse();
+        // console.log(this.msgRecord,this.objectId, toUserInfo.objectId)
       })
 
       this.toName = toUserInfo.username
@@ -203,6 +229,7 @@ export default {
         content: this.messageInput,
         receiver: this.nowChatUserInfo.objectId
       }).then(res => {
+        console.log(res)
         this.messageInput = ''
         //发送消息
         if (this.conn.open) {
@@ -210,12 +237,32 @@ export default {
           this.sendMessage(this.messageInfo);
         }
       })
+    },
+    callPhone() {
+      this.callPhonePopShow = !this.callPhonePopShow
+
+      navigator.mediaDevices.getUserMedia({video: false, audio: true}, (stream) => {
+        const call = peer.call(this.toName, stream);
+        call.on('stream', (remoteStream) => {
+          // Show stream in some <video> element.
+          this.audio.srcObject = remoteStream
+        });
+      }, (err) => {
+        console.error('Failed to get local stream', err);
+      });
+    },
+    closecallPhonePop() {
+      this.callPhonePopShow = !this.callPhonePopShow
+    },
+    formatTime(time) {
+      return dayjs(time).format('HH:mm')
     }
   },
   watch: {
     msgRecord: function () {
+      // console.log(this.msgRecord)
       let div = document.getElementById('messageDiv');
-      console.log(div.scrollTop, div.scrollHeight)
+      // console.log(div.scrollTop, div.scrollHeight)
       setTimeout(() => {
         div.scrollTop = div.scrollHeight;
       }, 20)
@@ -388,5 +435,20 @@ export default {
   margin: 0px 10px 0px 60px;
   word-wrap:break-word;
   font-weight: 300;
+}
+.messageListTopRight {
+  float: right;
+  margin:7px 15px;
+}
+.el-icon-phone {
+   font-size:200%
+}
+.callPhonePop {
+  position: absolute;
+  width: 100%;
+  height: 100px;
+  background-color: #fff;
+  float: left;
+  z-index: 1000;
 }
 </style>
