@@ -50,11 +50,17 @@
         </div>
         <!-- 语音通话弹窗 -->
         <div v-show="callPhonePopShow" class="callPhonePop" @click="closecallPhonePop()">
-          <audio id="audio"></audio>
+          <audio id="audio" autoplay></audio>
+          <button @click="closeCallPhone()">挂断</button>
         </div>
       </div>
       <hr class="friendsHr">
       <div class="messageMainList" id="messageDiv">
+      <!-- 是否接收通话弹窗 -->
+        <div v-show="acceptCallPhoneShow" class="acceptCallPhone">
+          <button @click="acceptCallPhoneBtn('accept')">接受</button>
+          <button @click="acceptCallPhoneBtn('refuse')">拒绝</button>
+        </div>
         <div class="friendInfo"></div>
         <!-- 消息显示div -->
         <div class="messages" v-for="item in msgRecord">
@@ -98,9 +104,12 @@ export default {
       userId: null,
       peer: null,
       conn: null,
+      callConn: null,
+      callStream: null,
       recentContactList: [],
       nowChatUserInfo: {},
       callPhonePopShow: false,
+      acceptCallPhoneShow: false,
       audio: null
     }
   },
@@ -128,6 +137,7 @@ export default {
 
     // 获取audio控件
     this.audio = document.getElementById("audio")
+
   },
   methods: {
     hashCode(str){
@@ -146,7 +156,7 @@ export default {
         return;
       }
 
-      let connOption = { host: 'localhost', port: 9000, path: '/', debug: 3};
+      let connOption = { host: 'www.lanzyy.com', port: 9000, path: '/', debug: 3};
 
       //创建peer实例
       this.peer = new Peer(this.hashCode(this.myName), connOption);
@@ -161,9 +171,33 @@ export default {
         console.log('有人连接了')
         //收到对方消息的回调
         conn.on('data', (data) => {
-          console.log('有人call2========')
           var msg = JSON.parse(data);
           console.log('对方的消息', msg)
+          if (msg.action == 'call') {
+            console.log('是否接受通话')
+            this.callPhonePopShow = !this.callPhonePopShow
+            this.acceptCallPhoneShow = !this.acceptCallPhoneShow
+            
+          }
+
+          if (msg.action == 'accept') {
+            navigator.mediaDevices.getUserMedia({video: false, audio: true}).then((stream) => {
+              this.callStream = stream.getTracks()[0]
+              this.callConn = this.peer.call(this.hashCode(this.toName), stream);
+              this.callConn.on('stream', (remoteStream) => {
+                console.log('accept stream====================')
+                // Show stream in some <video> element.
+                this.audio.srcObject = remoteStream
+              });
+            }).catch((err) => {
+              console.log('err ====================', err)
+            })
+          }
+          if (msg.action == 'closeCall') {
+            this.closeCallPhone(2)
+          }
+
+          // 默认接收信息不处理
           this.msgRecord.push(msg)
           if (this.toName.length == 0) {
             this.toName = msg.from
@@ -173,16 +207,18 @@ export default {
       });
 
       this.peer.on('call', (call) => {
-        console.log('有人call1========')
-        navigator.mediaDevices.getUserMedia({video: false, audio: true}, (stream) => {
-          call.answer(stream); // Answer the call with an A/V stream.
+        this.callConn = call
+        navigator.mediaDevices.getUserMedia({video: false, audio: true}).then((stream) => {
+          this.callStream = stream.getTracks()[0]
+          call.answer(stream)// Answer the call with an A/V stream.
           call.on('stream', (remoteStream) => {
+            console.log('accept stream====================')
             // Show stream in some <video> element.
             this.audio.srcObject = remoteStream
           });
-        }, (err) => {
-          console.error('Failed to get local stream', err);
-        });
+        }).catch((err) => {
+          console.log('err ====================', err)
+        })
       });
     },
     sendMessage(message) {
@@ -191,7 +227,7 @@ export default {
     },
     // 点击好友卡片之后建立连接
     createConn(toUserInfo) {
-      // console.log('---------', toUserInfo.objectId)
+      console.log('---------', toUserInfo.objectId)
       // 把当前聊天的好友信息获取出来
       this.nowChatUserInfo = toUserInfo
       // 获取消息记录并显示
@@ -241,15 +277,27 @@ export default {
     callPhone() {
       this.callPhonePopShow = !this.callPhonePopShow
 
-      navigator.mediaDevices.getUserMedia({video: false, audio: true}, (stream) => {
-        const call = peer.call(this.toName, stream);
-        call.on('stream', (remoteStream) => {
-          // Show stream in some <video> element.
-          this.audio.srcObject = remoteStream
-        });
-      }, (err) => {
-        console.error('Failed to get local stream', err);
-      });
+      this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "call"}));
+    },
+    acceptCallPhoneBtn(action) {
+      switch(action) {
+        case 'accept': {
+           this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "accept"}));
+        }break;
+        case 'refuse': {
+           this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "refuse"}));
+        }break
+      }
+    },
+    closeCallPhone(params) {
+      if (this.callStream) {
+        this.callConn.close()
+        this.callStream.stop()
+        this.audio.srcObject = null
+        if (params != 2) {
+          this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "closeCall"}));
+        }
+      }
     },
     closecallPhonePop() {
       this.callPhonePopShow = !this.callPhonePopShow
@@ -310,7 +358,9 @@ export default {
   width: 75px;
   background-color: #4b4e55;
   margin: 0px auto;
-  margin-top: 480%;
+  /* margin-top: 480% */
+  position: relative;
+  top: 60%;
   overflow: hidden;
   border-radius: 100%;
 }
@@ -450,5 +500,13 @@ export default {
   background-color: #fff;
   float: left;
   z-index: 1000;
+}
+.acceptCallPhone {
+  position: absolute;
+  width: 250px;
+  height: 150px;
+  background-color: #fff;
+  top: 30%;
+  left: 50%;
 }
 </style>
