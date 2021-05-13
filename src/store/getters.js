@@ -6,5 +6,6 @@ const getters = {
   status: state => state.user.status,
   token: state => state.user.token,
   recentContactid: state => state.user.recentContactid,
+  avatar: state => state.user.avatar,
 }
 export default getters

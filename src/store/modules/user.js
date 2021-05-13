@@ -10,7 +10,8 @@ const getDefaultState = () => {
     phoneNumber: '',
     acount: {},
     status: -1,
-    recentContactid: ''
+    recentContactid: '',
+    avatar: 1
   }
 }
 
@@ -40,6 +41,9 @@ const mutations = {
   },
   SET_CONTACT: (state, contact) => {
     state.recentContactid = contact
+  },
+  SET_AVATAR: (state, avatar) => {
+    state.avatar = avatar
   }
 }
 
@@ -65,6 +69,7 @@ const actions = {
         commit('SET_PHONEnUMBER', response.phoneNumber)
         commit('SET_CONTACT', response.recentContact.objectId)
         commit('SET_ACOUNT', response.acount)
+        commit('SET_AVATAR', response.avatar)
         setToken(sessionToken)
         resolve()
       }).catch(error => {

@@ -7,7 +7,7 @@
     <div class="left">
       <!-- 头像 -->
       <div class="avatar">
-        此处显示头像
+        <img :src="userAvatar[avatar]" class="avatarImg">
       </div>
       <!-- 其他按钮 -->
       <div class="leftButton">
@@ -31,7 +31,7 @@
       <!-- 好友列表 -->
       <div class="friendTab" v-for="item in recentContactList" @click="createConn(item)">
         <div class="friendAvatar">
-          {{item.acount.avatar}}
+          <img :src="userAvatar[item.avatar]" class="friendAvatarP">
         </div>
         <div class="friendName">
           {{item.username}}
@@ -47,11 +47,17 @@
         <!-- 消息列表上方导航右侧按钮 -->
         <div class="messageListTopRight">
           <i class="el-icon-phone" @click="callPhone()"></i>
+          <i class="el-icon-video-camera-solid" @click="callVideo()"></i>
         </div>
         <!-- 语音通话弹窗 -->
         <div v-show="callPhonePopShow" class="callPhonePop" @click="closecallPhonePop()">
           <audio id="audio" autoplay></audio>
           <button @click="closeCallPhone()">挂断</button>
+        </div>
+        <!-- 视频通话弹窗 -->
+        <div v-show="callVideoPopShow" class="callVideoPop" @click="callVideoPop()">
+          <video id="video" autoplay width="200" height="400"></video>
+          <button @click="closeCallVideo()">挂断</button>
         </div>
       </div>
       <hr class="friendsHr">
@@ -61,8 +67,14 @@
           <button @click="acceptCallPhoneBtn('accept')">接受</button>
           <button @click="acceptCallPhoneBtn('refuse')">拒绝</button>
         </div>
+        <!-- 是否接收语音弹窗 -->
+        <div v-show="acceptCallVideoShow" class="acceptCallPhone">
+          <button @click="acceptCallVideoBtn('accept')">接受</button>
+          <button @click="acceptCallVideoBtn('refuse')">拒绝</button>
+        </div>
         <div class="friendInfo"></div>
         <!-- 消息显示div -->
+        <div class="callPhonePopShowBackground" v-show="callPhonePopShowBackgroundShow"></div>
         <div class="messages" v-for="item in msgRecord">
           <div class="messageAvatar"></div>
           <div class="messageInfo">
@@ -71,6 +83,8 @@
           </div>
           <div class="messageBody">{{item.content}}</div>
         </div>
+        
+        
         <div class="messageInfoDiv">
         <el-input
           class="messageInput"
@@ -106,15 +120,27 @@ export default {
       conn: null,
       callConn: null,
       callStream: null,
+      videoStream: null,
       recentContactList: [],
       nowChatUserInfo: {},
       callPhonePopShow: false,
+      callVideoPopShow: false,
       acceptCallPhoneShow: false,
-      audio: null
+      acceptCallVideoShow: false,
+      callPhonePopShowBackgroundShow: false,
+      audio: null,
+      video: null,
+      callCoonStatus: null,
+      userAvatar: {
+        1: require('../../assets/images/avatar/1.jpg'),
+        2: require('../../assets/images/avatar/2.jpg'),
+        3: require('../../assets/images/avatar/3.jpg'),
+        4: require('../../assets/images/avatar/4.jpg'),
+      },
     }
   },
   computed: {
-    ...mapGetters(["username", "objectId", "recentContactid"]),
+    ...mapGetters(["username", "objectId", "recentContactid", "avatar"]),
   },
   created() {
     // 在页面加载时读取sessionStorage
@@ -137,7 +163,7 @@ export default {
 
     // 获取audio控件
     this.audio = document.getElementById("audio")
-
+    this.video = document.getElementById("video")
   },
   methods: {
     hashCode(str){
@@ -173,14 +199,21 @@ export default {
         conn.on('data', (data) => {
           var msg = JSON.parse(data);
           console.log('对方的消息', msg)
+          // 接收到语音请求
           if (msg.action == 'call') {
             console.log('是否接受通话')
             this.callPhonePopShow = !this.callPhonePopShow
             this.acceptCallPhoneShow = !this.acceptCallPhoneShow
-            
           }
-
+          // 接收到视频请求
+          if (msg.action == 'video') {
+            console.log('是否接受通话')
+            this.callVideoPopShow = !this.callVideoPopShow
+            this.acceptCallVideoShow = !this.acceptCallVideoShow
+          }
+          // 接收到接受语音通话信息
           if (msg.action == 'accept') {
+            this.callCoonStatus = 'audio'
             navigator.mediaDevices.getUserMedia({video: false, audio: true}).then((stream) => {
               this.callStream = stream.getTracks()[0]
               this.callConn = this.peer.call(this.hashCode(this.toName), stream);
@@ -193,8 +226,30 @@ export default {
               console.log('err ====================', err)
             })
           }
+          // 接收到接受视频通话信息
+          if (msg.action == 'acceptVideo') {
+            this.callCoonStatus = 'vedio'
+            navigator.mediaDevices.getUserMedia({video: true, audio: true}).then((stream) => {
+              this.videoStream = stream.getTracks()[0]
+              this.callConn = this.peer.call(this.hashCode(this.toName), stream);
+              this.callConn.on('stream', (remoteStream) => {
+                console.log('accept stream====================')
+                // Show stream in some <video> element.
+                this.video.srcObject = remoteStream
+              });
+            }).catch((err) => {
+              console.log('err ====================', err)
+            })
+          }
           if (msg.action == 'closeCall') {
+            this.callCoonStatus = null
+            this.callPhonePopShow = !this.callPhonePopShow
             this.closeCallPhone(2)
+          }
+          if (msg.action == 'closeVideo') {
+            this.callCoonStatus = null
+            this.callVideoPopShow = !this.callVideoPopShow
+            this.closeCallVideo(2)
           }
 
           // 默认接收信息不处理
@@ -208,13 +263,21 @@ export default {
 
       this.peer.on('call', (call) => {
         this.callConn = call
-        navigator.mediaDevices.getUserMedia({video: false, audio: true}).then((stream) => {
-          this.callStream = stream.getTracks()[0]
+        navigator.mediaDevices.getUserMedia({video: true, audio: true}).then((stream) => {
+          if(this.callCoonStatus == 'audio') {
+            this.callStream = stream.getTracks()[0]
+          } else {
+            this.videoStream = stream.getTracks()[0]
+          }
           call.answer(stream)// Answer the call with an A/V stream.
           call.on('stream', (remoteStream) => {
             console.log('accept stream====================')
             // Show stream in some <video> element.
-            this.audio.srcObject = remoteStream
+            if(this.callCoonStatus == 'audio') {
+              this.audio.srcObject = remoteStream
+            } else {
+              this.video.srcObject = remoteStream
+            }
           });
         }).catch((err) => {
           console.log('err ====================', err)
@@ -274,22 +337,49 @@ export default {
         }
       })
     },
+    // 点击语音通话图标
     callPhone() {
       this.callPhonePopShow = !this.callPhonePopShow
+      this.callPhonePopShowBackgroundShow = !this.callPhonePopShowBackgroundShow
 
       this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "call"}));
     },
+    // 点击视频通话图标
+    callVideo() {
+      this.callVideoPopShow = !this.callVideoPopShow
+
+      this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "video"}));
+    },
+    // 接受语音
     acceptCallPhoneBtn(action) {
+      this.callCoonStatus = 'audio'
+      console.log("jieshoutonghua=========")
       switch(action) {
         case 'accept': {
-           this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "accept"}));
+          this.acceptCallPhoneShow = !this.acceptCallPhoneShow
+          this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "accept"}));
         }break;
         case 'refuse': {
-           this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "refuse"}));
+          this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "refuse"}));
         }break
       }
     },
+    // 接受视频通话
+    acceptCallVideoBtn (action) {
+      this.callCoonStatus = 'vedio'
+      switch(action) {
+        case 'accept': {
+          this.acceptCallVideoShow = !this.acceptCallVideoShow
+          this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "acceptVideo"}));
+        }break;
+        case 'refuse': {
+          this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "refuseVideo"}));
+        }break
+      }
+    },
+    // 挂断语音
     closeCallPhone(params) {
+      this.callCoonStatus = null
       if (this.callStream) {
         this.callConn.close()
         this.callStream.stop()
@@ -299,8 +389,23 @@ export default {
         }
       }
     },
+    // 挂断视频
+    closeCallVideo(params) {
+      this.callCoonStatus = null
+      if (this.videoStream) {
+        this.callConn.close()
+        this.videoStream.stop()
+        this.video.srcObject = null
+        if (params != 2) {
+          this.conn.send(JSON.stringify({ "sender": this.myName, "receiver": this.toName, "action": "closeVideo"}));
+        }
+      }
+    },
     closecallPhonePop() {
       this.callPhonePopShow = !this.callPhonePopShow
+    },
+    callVideoPop() {
+      this.callVideoPopShow = !this.callVideoPopShow
     },
     formatTime(time) {
       return dayjs(time).format('HH:mm')
@@ -340,6 +445,15 @@ export default {
   width: 85px;
   margin: 0px auto;
   margin-top: 10px;
+  margin-bottom: 30px;
+  /* background-color: rgb(255, 255, 255); */
+  border-radius: 10px;
+}
+.avatarImg {
+  height: 85px;
+  width: 85px;
+  margin: 0px auto;
+  /* margin-top: 10px; */
   margin-bottom: 30px;
   background-color: #fff;
   border-radius: 10px;
@@ -399,6 +513,13 @@ export default {
   background-color: rgb(238, 130, 130);
   float: left;
 }
+.friendAvatarP {
+  width: 60px;
+  height: 60px;
+  border-radius: 100%;
+  background-color: rgb(238, 130, 130);
+  float: left;
+}
 .friendName {
   width: 180px;
   height: 25px;
@@ -444,6 +565,7 @@ export default {
   width: 100%;
   height: 85%;
   overflow: hidden;
+  float: left;
   /* padding-right: 20px; */
 }
 .messageMainList:hover {
@@ -493,11 +615,24 @@ export default {
 .el-icon-phone {
    font-size:200%
 }
+.el-icon-video-camera-solid {
+  font-size:200%
+}
 .callPhonePop {
+  position: absolute;
+  width: 320px;
+  height: 480px;
+  background-color: #fff;
+  float: left;
+  top: 100px;
+  left: 350px;
+  z-index: 1000;
+}
+.callVideoPop {
   position: absolute;
   width: 100%;
   height: 100px;
-  background-color: #fff;
+  background-color: rgb(255, 0, 0);
   float: left;
   z-index: 1000;
 }
@@ -508,5 +643,11 @@ export default {
   background-color: #fff;
   top: 30%;
   left: 50%;
+}
+.callPhonePopShowBackground {
+  background-color: #fff;
+  width: 100%;
+  height: 100%;
+  float: left;
 }
 </style>
